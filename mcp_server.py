@@ -1,10 +1,7 @@
 from pydantic import Field
-
 from mcp.server.fastmcp import FastMCP
 
-
 mcp = FastMCP("DocumentMCP", log_level="ERROR")
-
 
 docs = {
     "deposition.md": "This deposition covers the testimony of Angela Smith, P.E.",
@@ -15,8 +12,7 @@ docs = {
     "spec.txt": "These specifications define the technical requirements for the equipment.",
 }
 
-# TODO: Write a tool to read a doc
-
+# Tool to read a document
 @mcp.tool(
     name="read_doc_contents",
     description="Read the contents of a document and return it as a string."
@@ -28,7 +24,8 @@ def read_document(
         raise ValueError(f"Doc with id {doc_id} not found")
     
     return docs[doc_id]
-# TODO: Write a tool to edit a doc
+
+# Tool to edit a document
 @mcp.tool(
     name="edit_document",
     description="Edit a document by replacing a string in the documents content with a new string."
@@ -42,49 +39,78 @@ def edit_document(
         raise ValueError(f"Doc with id {doc_id} not found")
     
     docs[doc_id] = docs[doc_id].replace(old_str, new_str)
-# TODO: Write a resource to return all doc id's
+    return f"Successfully updated document {doc_id}"
+
+# Resource to return all document IDs
 @mcp.resource(
-    "docs://documents",
-    mime_type="application/json"
+    "docs://documents"
 )
-def list_docs() -> list[str]:
+def list_docs():
+    """Return a list of all document IDs"""
     return list(docs.keys())
 
+# Resource to return the contents of a particular document
 @mcp.resource(
-    "docs://documents/{doc_id}",
-    mime_type="text/plain"
+    "docs://documents/{doc_id}"
 )
-def fetch_doc(doc_id: str) -> str:
+def fetch_doc(doc_id: str):
+    """Return the contents of a specific document"""
     if doc_id not in docs:
         raise ValueError(f"Doc with id {doc_id} not found")
     return docs[doc_id]
-# TODO: Write a resource to return the contents of a particular doc
-# TODO: Write a prompt to rewrite a doc in markdown format
 
+# Prompt to rewrite a document in markdown format
 @mcp.prompt(
-    name="format",
+    name="format_markdown",
     description="Rewrites the contents of the document in Markdown format."
 )
 def format_document(
     doc_id: str = Field(description="Id of the document to format")
-) -> list[base.Message]:
-    prompt = f"""
-Your goal is to reformat a document to be written with markdown syntax.
-
-The id of the document you need to reformat is:
-<document_id>
-{doc_id}
-</document_id>
-
-Add in headers, bullet points, tables, etc as necessary. Feel free to add in structure.
-Use the 'edit_document' tool to edit the document. After the document has been reformatted...
-"""
+):
+    if doc_id not in docs:
+        raise ValueError(f"Doc with id {doc_id} not found")
     
-    return [
-        base.UserMessage(prompt)
-    ]
-# TODO: Write a prompt to summarize a doc
+    content = docs[doc_id]
+    prompt = f"""Your goal is to reformat the following document to be written with markdown syntax.
 
+Document ID: {doc_id}
+Current content:
+{content}
+
+Please rewrite this content using proper markdown formatting:
+- Add headers where appropriate
+- Use bullet points for lists
+- Add emphasis with **bold** or *italic* text
+- Structure the content logically
+- Maintain the original meaning while improving readability
+
+After formatting, use the 'edit_document' tool to update the document with the new markdown content."""
+    
+    # Return just the prompt text, not wrapped in message format
+    return prompt
+
+# Prompt to summarize a document
+@mcp.prompt(
+    name="summarize",
+    description="Create a concise summary of the document content."
+)
+def summarize_document(
+    doc_id: str = Field(description="Id of the document to summarize")
+):
+    if doc_id not in docs:
+        raise ValueError(f"Doc with id {doc_id} not found")
+    
+    content = docs[doc_id]
+    prompt = f"""Please provide a concise summary of the following document:
+
+Document ID: {doc_id}
+Content:
+{content}
+
+Create a brief summary that captures the key points and main purpose of this document."""
+    
+    # Return just the prompt text, not wrapped in message format
+    return prompt
 
 if __name__ == "__main__":
     mcp.run(transport="stdio")
